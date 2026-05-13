@@ -23,7 +23,7 @@ st.set_page_config(
 # LOAD DATA
 # =========================================================
 
-df = pd.read_csv("dataset_kapal_preprocessing")
+df = pd.read_csv("dataset_kapal_preprocessing.csv")
 
 # =========================================================
 # CUSTOM CSS — Ultra Modern Ocean Dark Theme
