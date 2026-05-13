@@ -17,30 +17,27 @@ st.set_page_config(
 
 
 # ==========================================
-# LOAD DATA (FIX FINAL)
+# LOAD DATA
 # ==========================================
 @st.cache_data
 def load_data():
-    try:
-        df = pd.read_csv("dataset_kapal_preprocessing.csv")  # ✅ FIX FINAL KAMU
-        df.columns = df.columns.str.strip()
-        return df
-    except FileNotFoundError:
-        st.error("❌ dataset_kapal_preprocessing.csv tidak ditemukan!")
-        st.stop()
+    df = pd.read_csv("dataset_kapal_preprocessing.csv")
+    df.columns = df.columns.str.strip()
+    return df
 
 
 df = load_data()
 
 
 # ==========================================
-# TEXT FEATURE
+# CREATE TEXT REPRESENTATION (WAJIB)
 # ==========================================
 def build_text(row):
     return " ".join([
         str(row.get("nama_paket", "")),
         str(row.get("nama_kapal", "")),
         str(row.get("kategori", "")),
+        str(row.get("tipe_trip", "")),
         str(row.get("durasi", "")),
         str(row.get("fasilitas", "")),
         str(row.get("layanan", "")),
@@ -49,11 +46,11 @@ def build_text(row):
     ])
 
 
-df["text"] = df.apply(build_text, axis=1)
+df["processed_text"] = df.apply(build_text, axis=1)
 
 
 # ==========================================
-# MODEL SBERT
+# LOAD MODEL
 # ==========================================
 @st.cache_resource
 def load_model():
@@ -67,51 +64,50 @@ model = load_model()
 # EMBEDDINGS
 # ==========================================
 @st.cache_resource
-def create_embeddings(dataframe):
-    return model.encode(
-        dataframe["text"].astype(str).tolist(),
-        show_progress_bar=False
-    )
+def create_embeddings(texts):
+    return model.encode(list(texts), show_progress_bar=False)
 
 
-embeddings = create_embeddings(df)
+embeddings = create_embeddings(df["processed_text"])
 
 
 # ==========================================
-# RECOMMENDATION ENGINE
+# RECOMMENDATION FUNCTION
 # ==========================================
-def recommend(query, top_n=5):
-
+def recommend(query, top_n):
     query_vec = model.encode([query])
 
     scores = cosine_similarity(query_vec, embeddings)[0]
 
     top_idx = np.argsort(scores)[::-1][:top_n]
 
-    results = df.iloc[top_idx].copy()
-    results["score"] = scores[top_idx]
+    result = df.iloc[top_idx].copy()
+    result["score"] = scores[top_idx]
 
-    return results
+    return result
 
 
 # ==========================================
 # UI
 # ==========================================
-st.title("🚢 Sistem Rekomendasi Paket Wisata Phinisi (SBERT)")
-st.write("Cari paket wisata sesuai kebutuhan Anda")
+st.title("🚢 Sistem Rekomendasi Paket Wisata Kapal Phinisi (SBERT)")
+st.write("Rekomendasi berbasis kemiripan paket wisata, bukan keyword biasa.")
 
 
+# ==========================================
+# INPUT (FOKUS PAKET, BUKAN DESKRIPSI)
+# ==========================================
 kategori = st.selectbox(
-    "Pilih Kategori Trip",
+    "Pilih Kategori Paket",
     df["kategori"].dropna().unique()
 )
 
-user_input = st.text_area(
-    "Deskripsi perjalanan",
-    placeholder="contoh: private trip, snorkeling, jacuzzi, sunset dinner"
-)
-
 top_n = st.slider("Top-N Rekomendasi", 1, 10, 5)
+
+user_desc = st.text_area(
+    "Tambahan kebutuhan (opsional)",
+    placeholder="contoh: snorkeling, jacuzzi, sunset dinner, private chef"
+)
 
 
 # ==========================================
@@ -119,39 +115,49 @@ top_n = st.slider("Top-N Rekomendasi", 1, 10, 5)
 # ==========================================
 if st.button("🔍 Cari Rekomendasi"):
 
-    if user_input.strip() == "":
-        st.warning("Isi deskripsi dulu ya")
-        st.stop()
+    # 🔥 FIX KONSEP UTAMA: PAKET ADALAH UTAMA
+    if user_desc.strip() == "":
+        query = kategori
+    else:
+        query = f"{kategori} {user_desc}"
 
-    query = f"{kategori} {user_input}"
 
     results = recommend(query, top_n)
 
-    st.subheader("✨ Hasil Rekomendasi")
+
+    st.subheader("✨ Hasil Rekomendasi Terbaik")
+
 
     for _, row in results.iterrows():
 
-        col1, col2 = st.columns([1, 3])
+        col_img, col_info = st.columns([1, 3])
 
-        with col1:
+        # ================= IMAGE =================
+        with col_img:
             img = str(row.get("image_url", ""))
+
             if img.startswith("http"):
                 st.image(img, use_container_width=True)
+            else:
+                st.image("https://via.placeholder.com/300x200")
 
-        with col2:
+
+        # ================= INFO =================
+        with col_info:
             st.markdown(f"""
-            ## {row.get('nama_paket','-')}
+## {row.get('nama_paket','-')}
 
-            **Kapal:** {row.get('nama_kapal','-')}  
-            **Kategori:** {row.get('kategori','-')}  
-            **Harga:** {row.get('harga','-')}  
-            **Durasi:** {row.get('durasi','-')}  
+**Kapal:** {row.get('nama_kapal','-')}  
+**Kategori:** {row.get('kategori','-')}  
+**Tipe Trip:** {row.get('tipe_trip','-')}  
+**Harga:** {row.get('harga','-')}  
+**Durasi:** {row.get('durasi','-')}  
 
-            **Destinasi:** {row.get('destinasi','-')}  
-            **Fasilitas:** {row.get('fasilitas','-')}  
-            **Layanan:** {row.get('layanan','-')}  
+**Destinasi:** {row.get('destinasi','-')}  
+**Fasilitas:** {row.get('fasilitas','-')}  
+**Layanan:** {row.get('layanan','-')}  
 
-            **Similarity Score:** {row['score']:.4f}
-            """)
+**Similarity Score:** {row['score']:.4f}
+""")
 
         st.divider()
