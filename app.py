@@ -17,20 +17,24 @@ st.set_page_config(
 
 
 # ==========================================
-# LOAD DATA
+# LOAD DATA (FIX: suban.csv)
 # ==========================================
 @st.cache_data
 def load_data():
-    df = pd.read_csv("phinisi_dataset.csv")  # <- ganti sesuai file kamu
-    df.columns = df.columns.str.strip()
-    return df
+    try:
+        df = pd.read_csv("suban.csv")  # ✅ FIX UTAMA KAMU
+        df.columns = df.columns.str.strip()
+        return df
+    except FileNotFoundError:
+        st.error("❌ File suban.csv tidak ditemukan di repository!")
+        st.stop()
 
 
 df = load_data()
 
 
 # ==========================================
-# CREATE TEXT FEATURE (WAJIB SBERT)
+# BUILD TEXT FEATURE (WAJIB SBERT)
 # ==========================================
 def build_text(row):
     return " ".join([
@@ -49,7 +53,7 @@ df["text"] = df.apply(build_text, axis=1)
 
 
 # ==========================================
-# MODEL SBERT
+# LOAD MODEL SBERT
 # ==========================================
 @st.cache_resource
 def load_model():
@@ -60,7 +64,7 @@ model = load_model()
 
 
 # ==========================================
-# EMBEDDING CACHE
+# CREATE EMBEDDINGS
 # ==========================================
 @st.cache_resource
 def create_embeddings(dataframe):
@@ -72,7 +76,7 @@ embeddings = create_embeddings(df)
 
 
 # ==========================================
-# RECOMMENDATION FUNCTION
+# RECOMMENDATION ENGINE
 # ==========================================
 def recommend(query, top_n=5):
 
@@ -109,12 +113,12 @@ top_n = st.slider("Jumlah Rekomendasi", 1, 10, 5)
 
 
 # ==========================================
-# BUTTON SEARCH
+# SEARCH BUTTON
 # ==========================================
 if st.button("🔍 Cari Rekomendasi"):
 
     if user_input.strip() == "":
-        st.warning("Masukkan deskripsi terlebih dahulu")
+        st.warning("Silakan isi deskripsi perjalanan.")
         st.stop()
 
     query = f"{kategori} {user_input}"
