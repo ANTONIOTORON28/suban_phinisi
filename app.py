@@ -17,16 +17,16 @@ st.set_page_config(
 
 
 # ==========================================
-# LOAD DATA (FIX: suban.csv)
+# LOAD DATA (FIX FINAL)
 # ==========================================
 @st.cache_data
 def load_data():
     try:
-        df = pd.read_csv("suban.csv")  # ✅ FIX UTAMA KAMU
+        df = pd.read_csv("dataset_kapal_preprocessing.csv")  # ✅ FIX FINAL KAMU
         df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
-        st.error("❌ File suban.csv tidak ditemukan di repository!")
+        st.error("❌ dataset_kapal_preprocessing.csv tidak ditemukan!")
         st.stop()
 
 
@@ -34,7 +34,7 @@ df = load_data()
 
 
 # ==========================================
-# BUILD TEXT FEATURE (WAJIB SBERT)
+# TEXT FEATURE
 # ==========================================
 def build_text(row):
     return " ".join([
@@ -53,7 +53,7 @@ df["text"] = df.apply(build_text, axis=1)
 
 
 # ==========================================
-# LOAD MODEL SBERT
+# MODEL SBERT
 # ==========================================
 @st.cache_resource
 def load_model():
@@ -64,12 +64,14 @@ model = load_model()
 
 
 # ==========================================
-# CREATE EMBEDDINGS
+# EMBEDDINGS
 # ==========================================
 @st.cache_resource
 def create_embeddings(dataframe):
-    texts = dataframe["text"].astype(str).tolist()
-    return model.encode(texts, show_progress_bar=False)
+    return model.encode(
+        dataframe["text"].astype(str).tolist(),
+        show_progress_bar=False
+    )
 
 
 embeddings = create_embeddings(df)
@@ -96,7 +98,7 @@ def recommend(query, top_n=5):
 # UI
 # ==========================================
 st.title("🚢 Sistem Rekomendasi Paket Wisata Phinisi (SBERT)")
-st.write("Cari paket wisata terbaik berdasarkan preferensi Anda")
+st.write("Cari paket wisata sesuai kebutuhan Anda")
 
 
 kategori = st.selectbox(
@@ -105,40 +107,37 @@ kategori = st.selectbox(
 )
 
 user_input = st.text_area(
-    "Deskripsi kebutuhan wisata",
+    "Deskripsi perjalanan",
     placeholder="contoh: private trip, snorkeling, jacuzzi, sunset dinner"
 )
 
-top_n = st.slider("Jumlah Rekomendasi", 1, 10, 5)
+top_n = st.slider("Top-N Rekomendasi", 1, 10, 5)
 
 
 # ==========================================
-# SEARCH BUTTON
+# SEARCH
 # ==========================================
 if st.button("🔍 Cari Rekomendasi"):
 
     if user_input.strip() == "":
-        st.warning("Silakan isi deskripsi perjalanan.")
+        st.warning("Isi deskripsi dulu ya")
         st.stop()
 
     query = f"{kategori} {user_input}"
 
     results = recommend(query, top_n)
 
-    st.subheader("✨ Hasil Rekomendasi Terbaik")
+    st.subheader("✨ Hasil Rekomendasi")
 
-    for i, row in results.iterrows():
+    for _, row in results.iterrows():
 
         col1, col2 = st.columns([1, 3])
 
-        # ================= IMAGE =================
         with col1:
             img = str(row.get("image_url", ""))
-
             if img.startswith("http"):
                 st.image(img, use_container_width=True)
 
-        # ================= INFO =================
         with col2:
             st.markdown(f"""
             ## {row.get('nama_paket','-')}
